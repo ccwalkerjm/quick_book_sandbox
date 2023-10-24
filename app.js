@@ -56,6 +56,8 @@ app.get("/authUri", urlencodedParser, function (req, res) {
     redirectUri: req.query.json.redirectUri,
   });
 
+  console.log("oauthClient", oauthClient)
+
   var authUri = oauthClient.authorizeUri({
     scope: [OAuthClient.scopes.Accounting],
     state: "intuit-test",
@@ -90,6 +92,7 @@ app.get("/retrieveToken", function (req, res) {
  * Refresh the access-token
  */
 app.get("/refreshAccessToken", function (req, res) {
+  console.log("oauthClient:", oauthClient)
   oauthClient
     .refresh()
     .then(function (authResponse) {
@@ -184,131 +187,131 @@ app.get("/getInvoiceByNumber", function (req, res) {
  * getDueInvoices ()
  */
 app.get("/getDueInvoices", function (req, res) {
-    // Ensure the OAuthClient is setup
-    if (!oauthClient) {
-      return res.json({
-        error: true,
-        message: "OAuthClient is not setup. Cannot retrieve invoices.",
-      });
-    }
-  
-    const { fromDate, toDate, invoiceNumber, balance, Customer_DisplayName } = req.query;
-  
-    if ((!fromDate && toDate) || (fromDate && !toDate)) {
-      return res.status(400).json({
-        error: true,
-        message: "Both fromDate and toDate are required together.",
-      });
-    }
-  
-    const companyID = oauthClient.getToken().realmId;
-  
-    const url =
-      oauthClient.environment == "sandbox"
-        ? OAuthClient.environment.sandbox
-        : OAuthClient.environment.production;
-  
-        let conditions = [];
+  // Ensure the OAuthClient is setup
+  if (!oauthClient) {
+    return res.json({
+      error: true,
+      message: "OAuthClient is not setup. Cannot retrieve invoices.",
+    });
+  }
 
-        if (fromDate && toDate) {
-          conditions.push(`DueDate >= '${fromDate}' AND DueDate <= '${toDate}'`);
-        }
-        
-        if (invoiceNumber) {
-          conditions.push(`DocNumber = '${invoiceNumber}'`);
-        }
-        
-        if (balance) {
-          conditions.push(`Balance = ${balance}`);
-        }
-        
-        if (customer) {
-          conditions.push(`CustomerRef.DisplayName = '${Customer_DisplayName}'`);
-        }
-        
-        if (conditions.length === 0) {
-          return res.status(400).json({
-            error: true,
-            message: "At least one filter parameter must be provided.",
-          });
-        }
-        
-        const query = `SELECT * FROM Invoice WHERE ${conditions.join(" AND ")}`;
-        console.log(`Final SQL Query: ${query}`);
+  const { fromDate, toDate, invoiceNumber, balance, Customer_DisplayName } = req.query;
 
-    oauthClient
-      .makeApiCall({
-        url: `${url}v3/company/${companyID}/query?query=${encodeURIComponent(
-          query
-        )}`,
-      })
-      .then(function (authResponse) {
-        console.log(
-          "The response for API call is: " + JSON.stringify(authResponse)
-        );
-        res.send(JSON.parse(authResponse.text()));
-      })
-      .catch(function (e) {
-        console.error(e);
-        res
-          .status(500)
-          .send("Failed to retrieve invoices. Check the logs for more details.");
-      });
-  });
+  if ((!fromDate && toDate) || (fromDate && !toDate)) {
+    return res.status(400).json({
+      error: true,
+      message: "Both fromDate and toDate are required together.",
+    });
+  }
 
-  app.get('/getInvoicesByUpdateRange', (req, res) => {
-    if (!oauthClient) {
-        return res.json({
-            error: true,
-            message: "OAuthClient is not setup. Cannot retrieve invoices.",
-        });
-    }
-    
-    const { startDateTime, endDateTime } = req.query;
-    
-    if (!startDateTime || !endDateTime) {
-        return res.status(400).json({
-            error: true,
-            message: "Both startDateTime and endDateTime are required.",
-        });
-    }
+  const companyID = oauthClient.getToken().realmId;
 
-    // Extract dates (without time) from startDateTime and endDateTime
-    const startDate = startDateTime.split('T')[0];
-    const endDate = endDateTime.split('T')[0];
-    
-    const companyID = oauthClient.getToken().realmId;
-    
-    const url =
-        oauthClient.environment === "sandbox"
-            ? OAuthClient.environment.sandbox
-            : OAuthClient.environment.production;
-    
-    // Query considers both LastUpdatedTime and TxnDate
-    const query = `
+  const url =
+    oauthClient.environment == "sandbox"
+      ? OAuthClient.environment.sandbox
+      : OAuthClient.environment.production;
+
+  let conditions = [];
+
+  if (fromDate && toDate) {
+    conditions.push(`DueDate >= '${fromDate}' AND DueDate <= '${toDate}'`);
+  }
+
+  if (invoiceNumber) {
+    conditions.push(`DocNumber = '${invoiceNumber}'`);
+  }
+
+  if (balance) {
+    conditions.push(`Balance = ${balance}`);
+  }
+
+  if (customer) {
+    conditions.push(`CustomerRef.DisplayName = '${Customer_DisplayName}'`);
+  }
+
+  if (conditions.length === 0) {
+    return res.status(400).json({
+      error: true,
+      message: "At least one filter parameter must be provided.",
+    });
+  }
+
+  const query = `SELECT * FROM Invoice WHERE ${conditions.join(" AND ")}`;
+  console.log(`Final SQL Query: ${query}`);
+
+  oauthClient
+    .makeApiCall({
+      url: `${url}v3/company/${companyID}/query?query=${encodeURIComponent(
+        query
+      )}`,
+    })
+    .then(function (authResponse) {
+      console.log(
+        "The response for API call is: " + JSON.stringify(authResponse)
+      );
+      res.send(JSON.parse(authResponse.text()));
+    })
+    .catch(function (e) {
+      console.error(e);
+      res
+        .status(500)
+        .send("Failed to retrieve invoices. Check the logs for more details.");
+    });
+});
+
+app.get('/getInvoicesByUpdateRange', (req, res) => {
+  if (!oauthClient) {
+    return res.json({
+      error: true,
+      message: "OAuthClient is not setup. Cannot retrieve invoices.",
+    });
+  }
+
+  const { startDateTime, endDateTime } = req.query;
+
+  if (!startDateTime || !endDateTime) {
+    return res.status(400).json({
+      error: true,
+      message: "Both startDateTime and endDateTime are required.",
+    });
+  }
+
+  // Extract dates (without time) from startDateTime and endDateTime
+  const startDate = startDateTime.split('T')[0];
+  const endDate = endDateTime.split('T')[0];
+
+  const companyID = oauthClient.getToken().realmId;
+
+  const url =
+    oauthClient.environment === "sandbox"
+      ? OAuthClient.environment.sandbox
+      : OAuthClient.environment.production;
+
+  // Query considers both LastUpdatedTime and TxnDate
+  const query = `
         SELECT * FROM Invoice 
         WHERE MetaData.LastUpdatedTime >= '${startDateTime}' 
             AND MetaData.LastUpdatedTime <= '${endDateTime}'
             AND TxnDate >= '${startDate}'
             AND TxnDate <= '${endDate}'
     `;
-    
-    console.log(`Final SQL Query: ${query}`);
-    
-    oauthClient
-        .makeApiCall({
-            url: `${url}v3/company/${companyID}/query?query=${encodeURIComponent(query)}`,
-        })
-        .then(function (authResponse) {
-            console.log("API Response: ", authResponse);
-            res.send(JSON.parse(authResponse.text()));
-        })
-        .catch(function (e) {
-            console.error("API Error: ", e);
-            res
-                .status(500)
-                .send("Failed to retrieve invoices. Check the logs for more details.");
-        });
+
+  console.log(`Final SQL Query: ${query}`);
+
+  oauthClient
+    .makeApiCall({
+      url: `${url}v3/company/${companyID}/query?query=${encodeURIComponent(query)}`,
+    })
+    .then(function (authResponse) {
+      console.log("API Response: ", authResponse);
+      res.send(JSON.parse(authResponse.text()));
+    })
+    .catch(function (e) {
+      console.error("API Error: ", e);
+      res
+        .status(500)
+        .send("Failed to retrieve invoices. Check the logs for more details.");
+    });
 });
 
 
@@ -401,14 +404,14 @@ const server = app.listen(process.env.PORT || 8000, () => {
     redirectUri = `${server.address().port}` + "/callback";
     console.log(
       `💳  See the Sample App in your browser : ` +
-        "http://localhost:" +
-        `${server.address().port}`
+      "http://localhost:" +
+      `${server.address().port}`
     );
     console.log(
       `💳  Copy this into Redirect URI on the browser : ` +
-        "http://localhost:" +
-        `${server.address().port}` +
-        "/callback"
+      "http://localhost:" +
+      `${server.address().port}` +
+      "/callback"
     );
     console.log(
       `💻  Make Sure this redirect URI is also copied on your app in : https://developer.intuit.com`
